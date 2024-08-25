@@ -1,0 +1,216 @@
+Attribute VB_Name = "SpecificRunCodes"
+'
+' 1. Get RGB value of a cell that is filled
+' 2. Copies cells of certain colours into certain tab
+' 3. Sets cell value based on cell fill colour
+' 4. Copies cells of all worksheets into new tab in position 2
+' 5. Highlight alternating groups of text - either by cell or rows.
+' 6. Sort tabs alphabetically
+'
+'
+'
+
+'
+
+Sub GetRGBColor_Fill()
+'PURPOSE: Output the RGB color code for the ActiveCell's Fill Color
+'SOURCE: www.TheSpreadsheetGuru.com
+'
+
+Dim HEXcolor As String
+Dim RGBcolor As String
+
+HEXcolor = Right("000000" & Hex(ActiveCell.Interior.Color), 6)
+
+RGBcolor = "RGB (" & CInt("&H" & Right(HEXcolor, 2)) & _
+", " & CInt("&H" & Mid(HEXcolor, 3, 2)) & _
+", " & CInt("&H" & Left(HEXcolor, 2)) & ")"
+
+'MsgBox RGBcolor, vbInformation, "Cell " & ActiveCell.Address(False, False) & ":  Fill Color"
+ActiveCell.Value = RGBcolor
+
+End Sub
+
+Sub CopyOnColor()
+'
+' Identifies if cell in row A fits a certain colour (yellow, green, dark green) and
+' copies it to tab no. 2
+'
+
+'Things to edit:
+
+Tab_no = 2
+Column_rng_1 = "A"
+Column_rng_2 = "D"
+
+'==========code begins here==========
+LastRow = Range("A9999").End(xlUp).Row
+
+
+For x = 1 To LastRow
+
+    'Check if the cell contains the cell fill yellow
+    If Range(Column_rng_1 & x).Interior.Color = RGB(255, 230, 153) _
+        Or Range(Column_rng_1 & x).Interior.Color = RGB(198, 224, 180) _
+        Or Range(Column_rng_1 & x).Interior.Color = RGB(169, 208, 142) Then
+        
+        'If it does, then copy the data
+        Range(Column_rng_1 & x, Column_rng_2 & x).Copy
+                
+        'Check to see if A1 is blank on sheet2
+        If Sheets(Tab_no).Range("A1").Value = "" Then
+        
+            'If it is, then paste the data there
+            Sheets(Tab_no).Range("A1").PasteSpecial xlPasteAll
+        Else
+            
+            'If it is already taken, then paste the data into the next row below
+            Sheets(Tab_no).Range("A9999").End(xlUp).Offset(1, 0).PasteSpecial xlPasteAll
+            
+        End If
+    End If
+Next x
+
+
+End Sub
+
+Sub ChangeValueBasedOnCellColor()
+'
+' Enters a value based on the cell fill colour
+'
+'
+'
+Dim rg As Range
+Dim xRg As Range
+Set xRg = Selection.Cells
+
+Application.DisplayAlerts = False
+
+For Each rg In xRg
+    With rg
+        Select Case .Interior.Color
+            Case Is = RGB(255, 230, 153) 'Yellow
+                .Value = "PE" ' partially effective
+            Case Is = RGB(198, 224, 180) 'Light green
+                .Value = "E" ' effective
+            Case Is = RGB(169, 208, 142) ' Dark Green
+                .Value = "BP" ' best practice
+        End Select
+    End With
+Next
+
+    Application.DisplayAlerts = False
+    
+End Sub
+
+Sub CopyAllColouredCellsintoSheet()
+'
+' Creates new Worksheet
+' Runs through all worksheets to copy all specifically coloured cells
+' Identifies blanks in the "M/D/O" row and deletes such rows.
+'
+
+Dim wb As Workbook
+Dim ws As Worksheet
+
+Set wb = ActiveWorkbook
+
+Set ws = wb.Worksheets.Add(After:=wb.Worksheets(1), Type:=xlWorksheet)
+Sheets(2).Name = "Compiled"
+
+    
+' Loop through all of the worksheets in the active workbook.
+For Each ws In Worksheets
+    
+    ws.Activate 'activate the new worksheet
+    'MsgBox (Wksht.Name & " copying...")
+    
+    CopyOnColor 'call CopyOnColor() sub
+    'MsgBox (ActiveSheet.Name & " done")
+         
+Next
+
+Sheets(2).Activate
+Columns("B:B").Select
+Selection.SpecialCells(xlCellTypeBlanks).Select
+Selection.EntireRow.Delete
+
+
+
+
+
+End Sub
+
+Sub HighLightRows()
+    Dim intRow As Integer: intRow = 3 ' start at 2, cause there's nothing to compare the first row with
+    Dim Colr1 As Boolean: Colr1 = True ' Will flip True/False; adding 2 gives 1 or 2
+    Dim lngColors(2 + True To 2 + False) As Long   ' Indexes : 1 and 2
+          ' True = -1, array index 1.    False = 0, array index 2.
+          
+          
+    '=====to edit per use=====
+    Dim intCol As Integer: intCol = 1 ' define the column with changing values
+    Dim ColToColour As Integer: ColToColour = 1 'change column number where needed
+    
+    
+    '=====change colours=====
+    
+    lngColors(2 + False) = RGB(221, 235, 247) ' lngColors(2) = light blue. 235 all = light grey
+    lngColors(2 + True) = RGB(255, 255, 255) '  lngColors(1) = white
+
+
+    '=====highlight cells=====
+    
+    Do While (ActiveSheet.Cells(intRow, ColToColour) <> "") 'while
+    
+        'check for different value in intCol, flip the boolean if it's different
+        If (ActiveSheet.Cells(intRow, intCol) <> ActiveSheet.Cells(intRow - 1, intCol)) Then Colr1 = Not Colr1
+        
+        '=====colour affected cells=====
+        ActiveSheet.Cells(intRow, ColToColour).Interior.Color = lngColors(2 + Colr1)
+        
+        '=====colour whole row=====
+        'ActiveSheet.Rows(intRow).Interior.Color = lngColors(2 + Colr1) ' one colour or the other
+        ' Optional : retain borders (these no longer show through when interior colour is changed) by specifically setting them
+        
+        '=====affects lines between cells=====
+        'With ActiveSheet.Rows(intRow).Borders
+        '    .LineStyle = xlContinuous
+        '    .Weight = xlThin
+        '    .Color = RGB(220, 220, 220) ' colour of cell lines
+        'End With
+        intRow = intRow + 1
+    Loop
+End Sub
+
+Sub Sort_Active_Book()
+Dim i As Integer
+Dim j As Integer
+Dim iAnswer As VbMsgBoxResult
+'
+' Prompt the user as which direction they wish to
+' sort the worksheets.
+'
+   iAnswer = MsgBox("Sort Sheets in Ascending Order?" & Chr(10) _
+     & "Clicking No will sort in Descending Order", _
+     vbYesNoCancel + vbQuestion + vbDefaultButton1, "Sort Worksheets")
+   For i = 1 To Sheets.Count
+      For j = 1 To Sheets.Count - 1
+'
+' If the answer is Yes, then sort in ascending order.
+'
+         If iAnswer = vbYes Then
+            If UCase$(Sheets(j).Name) > UCase$(Sheets(j + 1).Name) Then
+               Sheets(j).Move After:=Sheets(j + 1)
+            End If
+'
+' If the answer is No, then sort in descending order.
+'
+         ElseIf iAnswer = vbNo Then
+            If UCase$(Sheets(j).Name) < UCase$(Sheets(j + 1).Name) Then
+               Sheets(j).Move After:=Sheets(j + 1)
+            End If
+         End If
+      Next j
+   Next i
+End Sub
